@@ -20,7 +20,7 @@ R_LEN  = 6    # Pin 31
 # Pins als Ausgänge konfigurieren
 # Alle Pins werden als Ausgänge gesetzt (der Pi sendet Signale, empfängt nichts). Dann sofort auf LOW gesetzt, damit beim Start kein Motor versehentlich anläuft.
 # Die Enable-Pins bleiben beim Start auf LOW, der Motortreiber bleibt deaktiviert bis ein Fahrbefehl kommt.
-for pin in [L_RPWM, L_LPWM, L_REN, L_LEN, R_RPWM, R_LPWM, R_REN, R_LEN]:https://github.com/rolandsenn/Maturaarbeit/tree/main
+for pin in [L_RPWM, L_LPWM, L_REN, L_LEN, R_RPWM, R_LPWM, R_REN, R_LEN]:
     lgpio.gpio_claim_output(h, pin, 0)
 
 # PWM initialisieren (1000 Hz)
