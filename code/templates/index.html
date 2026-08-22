@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Roboter Steuerung</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: black;
+            color: white;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #videoStream {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            object-position: center;
+            background-color: black;
+            z-index: 1;
+        }
+
+        .overlay {
+            position: fixed;
+            z-index: 10;
+        }
+
+        .top-status {
+            top: 18px;
+            left: 22px;
+            font-family: "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", monospace;
+            font-size: 17px;
+            font-weight: 500;
+            color: white;
+            background: transparent;
+            border: none;
+            padding: 0;
+            text-shadow: 0 2px 7px rgba(0, 0, 0, 0.95);
+            white-space: nowrap;
+            letter-spacing: 0.7px;
+        }
+
+        .help-box {
+            top: 18px;
+            right: 22px;
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 23px;
+            font-weight: bold;
+            cursor: pointer;
+            background: rgba(0, 0, 0, 0.55);
+            border: none;
+            color: white;
+            backdrop-filter: blur(6px);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+        }
+
+        .help-text {
+            position: absolute;
+            top: 56px;
+            right: 0;
+            width: 260px;
+            padding: 14px 16px;
+            border-radius: 14px;
+            background: rgba(0, 0, 0, 0.78);
+            font-size: 14px;
+            line-height: 1.5;
+            text-align: left;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-6px);
+            transition: 0.18s ease;
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+        }
+
+        .help-box:hover .help-text,
+        .help-box:focus-within .help-text,
+        .help-box.active .help-text {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .left-controls {
+            left: 22px;
+            bottom: 22px;
+            width: 210px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stop-big {
+            width: 145px;
+            height: 145px;
+            border-radius: 50%;
+            border: none;
+            background: #c40024;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+            transition: transform 0.08s ease, background 0.08s ease, box-shadow 0.08s ease;
+        }
+
+        .stop-big:hover {
+            background: #e0002b;
+        }
+
+        .stop-big:active {
+            transform: scale(0.96);
+            background: #ff0033;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+        }
+
+        .shutdown {
+            width: 170px;
+            height: 34px;
+            border-radius: 8px;
+            border: none;
+            background: #0068d9;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 16px rgba(0, 0, 0, 0.35);
+            transition: transform 0.08s ease, background 0.08s ease, box-shadow 0.08s ease;
+        }
+
+        .shutdown:hover {
+            background: #0080ff;
+        }
+
+        .shutdown:active {
+            transform: scale(0.97);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+        }
+
+        .status {
+            width: 210px;
+            min-height: 20px;
+            text-align: center;
+            font-size: 13px;
+            color: white;
+            text-shadow: 0 2px 7px rgba(0, 0, 0, 0.95);
+        }
+
+        .right-controls {
+            right: 22px;
+            bottom: 22px;
+            width: 260px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .speed-box {
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-size: 14px;
+            text-shadow: 0 2px 7px rgba(0, 0, 0, 0.95);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin-top: 5px;
+            accent-color: white;
+            cursor: pointer;
+        }
+
+        .direction-grid {
+            display: grid;
+            grid-template-columns: 58px 58px 58px;
+            grid-template-rows: 58px 58px 58px;
+            gap: 8px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .drive-button,
+        .led-center {
+            width: 58px;
+            height: 58px;
+            border-radius: 11px;
+            border: none;
+            background: rgba(255, 255, 255, 0.92);
+            color: black;
+            font-size: 34px;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: none;
+            box-shadow: 0 5px 16px rgba(0, 0, 0, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            transition: transform 0.08s ease, background 0.08s ease, box-shadow 0.08s ease;
+        }
+
+        .drive-button:hover,
+        .led-center:hover {
+            background: white;
+        }
+
+        .drive-button:active,
+        .drive-button.pressed,
+        .led-center:active,
+        .led-center.pressed {
+            transform: scale(0.88);
+            background: #d8d8d8;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+        }
+
+        .led-center {
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        .led-icon {
+            width: 30px;
+            height: 30px;
+            display: block;
+            fill: none;
+            stroke: black;
+            stroke-width: 2.4;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .empty {
+            width: 58px;
+            height: 58px;
+            pointer-events: none;
+        }
+
+        @media (max-width: 760px) {
+            .top-status {
+                top: 12px;
+                left: 12px;
+                font-size: 12px;
+                max-width: calc(100vw - 75px);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                letter-spacing: 0.4px;
+            }
+
+            .help-box {
+                top: 12px;
+                right: 12px;
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+
+            .help-text {
+                width: 230px;
+                font-size: 13px;
+            }
+
+            .left-controls {
+                left: 12px;
+                bottom: 12px;
+                width: 145px;
+            }
+
+            .stop-big {
+                width: 100px;
+                height: 100px;
+                font-size: 18px;
+            }
+
+            .shutdown {
+                width: 130px;
+                height: 32px;
+                font-size: 12px;
+            }
+
+            .status {
+                width: 145px;
+                font-size: 11px;
+            }
+
+            .right-controls {
+                right: 12px;
+                bottom: 12px;
+                width: 205px;
+            }
+
+            .speed-box {
+                font-size: 12px;
+            }
+
+            .direction-grid {
+                grid-template-columns: 48px 48px 48px;
+                grid-template-rows: 48px 48px 48px;
+                gap: 7px;
+            }
+
+            .drive-button,
+            .led-center,
+            .empty {
+                width: 48px;
+                height: 48px;
+            }
+
+            .drive-button {
+                font-size: 27px;
+            }
+
+            .led-icon {
+                width: 25px;
+                height: 25px;
+            }
+        }
+
+        @media (max-width: 430px) {
+            .left-controls {
+                bottom: 10px;
+                left: 10px;
+            }
+
+            .right-controls {
+                bottom: 10px;
+                right: 10px;
+                width: 185px;
+            }
+
+            .stop-big {
+                width: 88px;
+                height: 88px;
+                font-size: 16px;
+            }
+
+            .shutdown {
+                width: 120px;
+                height: 30px;
+            }
+
+            .direction-grid {
+                grid-template-columns: 43px 43px 43px;
+                grid-template-rows: 43px 43px 43px;
+                gap: 6px;
+            }
+
+            .drive-button,
+            .led-center,
+            .empty {
+                width: 43px;
+                height: 43px;
+            }
+
+            .drive-button {
+                font-size: 24px;
+            }
+
+            .led-icon {
+                width: 22px;
+                height: 22px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <img id="videoStream" src="/video" alt="MJPEG Kamera-Stream">
+
+    <div class="overlay top-status" id="topStatus">
+        --:--:-- | --- x --- | -- FPS | -- ms
+    </div>
+
+    <div class="overlay help-box" id="helpBox" tabindex="0" onclick="toggleHelp()">
+        i
+        <div class="help-text">
+            <strong>Tastatursteuerung</strong><br>
+            W = vorwärts<br>
+            A = links<br>
+            S = rückwärts<br>
+            D = rechts<br>
+            Leertaste = Stopp<br><br>
+            Auf dem Handy oder Tablet die Pfeile gedrückt halten.
+        </div>
+    </div>
+
+    <div class="overlay left-controls">
+        <button class="stop-big" onclick="stoppen(true)">STOP</button>
+        <button class="shutdown" onclick="shutdownPi()">SHUTDOWN</button>
+        <div class="status" id="status">Status: bereit</div>
+    </div>
+
+    <div class="overlay right-controls">
+        <div class="speed-box">
+            Geschwindigkeit: <span id="speedValue">60</span>%
+            <input
+                type="range"
+                id="speed"
+                min="0"
+                max="100"
+                value="60"
+                oninput="updateSpeed()"
+            >
+        </div>
+
+        <div class="direction-grid">
+            <div class="empty"></div>
+
+            <button
+                class="drive-button"
+                onpointerdown="startFahren(event, 'vorwaerts')"
+                onpointerup="stoppen(true)"
+                onpointercancel="stoppen(true)"
+            >
+                ↑
+            </button>
+
+            <div class="empty"></div>
+
+            <button
+                class="drive-button"
+                onpointerdown="startFahren(event, 'links')"
+                onpointerup="stoppen(true)"
+                onpointercancel="stoppen(true)"
+            >
+                ←
+            </button>
+
+            <button class="led-center" onclick="ledToggle()" aria-label="LED umschalten">
+                <svg class="led-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M9 18h6"></path>
+                    <path d="M10 21h4"></path>
+                    <path d="M8.5 14.5c-1.6-1.1-2.5-2.9-2.5-4.9C6 6.3 8.7 3.6 12 3.6s6 2.7 6 6c0 2-1 3.8-2.5 4.9-.8.6-1.2 1.2-1.2 2H9.7c0-.8-.4-1.4-1.2-2z"></path>
+                    <path d="M12 1.8v-1"></path>
+                    <path d="M4.8 4.2l-.7-.7"></path>
+                    <path d="M19.2 4.2l.7-.7"></path>
+                </svg>
+            </button>
+
+            <button
+                class="drive-button"
+                onpointerdown="startFahren(event, 'rechts')"
+                onpointerup="stoppen(true)"
+                onpointercancel="stoppen(true)"
+            >
+                →
+            </button>
+
+            <div class="empty"></div>
+
+            <button
+                class="drive-button"
+                onpointerdown="startFahren(event, 'rueckwaerts')"
+                onpointerup="stoppen(true)"
+                onpointercancel="stoppen(true)"
+            >
+                ↓
+            </button>
+
+            <div class="empty"></div>
+        </div>
+    </div>
+
+    <script>
+        const HEARTBEAT_INTERVAL_MS = 500;
+
+        let aktuelleRichtung = null;
+        let heartbeatInterval = null;
+        let aktiverFahrButton = null;
+
+        let piZeit = "--:--:--";
+        let streamAufloesung = "--- x ---";
+        let streamFps = "--";
+        let pingMs = "--";
+
+        function renderTopStatus() {
+            document.getElementById("topStatus").innerText =
+                piZeit + " | " + streamAufloesung + " | " + streamFps + " FPS | " + pingMs + " ms";
+        }
+
+        function setStatus(text) {
+            document.getElementById("status").innerText = "Status: " + text;
+        }
+
+        function getSpeed() {
+            return document.getElementById("speed").value;
+        }
+
+        function updateSpeed() {
+            const speed = getSpeed();
+            document.getElementById("speedValue").innerText = speed;
+
+            fetch("/geschwindigkeit/" + speed, {
+                method: "POST",
+                cache: "no-store"
+            }).then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Geschwindigkeit konnte nicht gesetzt werden");
+                }
+            }).catch(function () {
+                setStatus("Fehler Geschwindigkeit");
+            });
+        }
+
+        function senden(url, method = "POST") {
+            return fetch(url, {
+                method: method,
+                cache: "no-store"
+            });
+        }
+
+        function startFahren(event, richtung) {
+            event.preventDefault();
+
+            if (aktiverFahrButton !== null) {
+                aktiverFahrButton.classList.remove("pressed");
+            }
+
+            aktiverFahrButton = event.currentTarget;
+            aktiverFahrButton.classList.add("pressed");
+
+            if (event.currentTarget.setPointerCapture) {
+                event.currentTarget.setPointerCapture(event.pointerId);
+            }
+
+            fahren(richtung);
+        }
+
+        function resetFahrButton() {
+            if (aktiverFahrButton !== null) {
+                aktiverFahrButton.classList.remove("pressed");
+                aktiverFahrButton = null;
+            }
+        }
+
+        function fahren(richtung) {
+            aktuelleRichtung = richtung;
+
+            senden("/geschwindigkeit/" + getSpeed())
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("Geschwindigkeit fehlgeschlagen");
+                    }
+
+                    return senden("/fahren/" + richtung);
+                })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("Fahrbefehl fehlgeschlagen");
+                    }
+
+                    setStatus("fährt " + richtung);
+                    starteHeartbeat();
+                })
+                .catch(function () {
+                    setStatus("Fehler Fahrbefehl");
+                    resetFahrButton();
+                    aktuelleRichtung = null;
+
+                    if (heartbeatInterval !== null) {
+                        clearInterval(heartbeatInterval);
+                        heartbeatInterval = null;
+                    }
+                });
+        }
+
+        function starteHeartbeat() {
+            if (heartbeatInterval !== null) {
+                clearInterval(heartbeatInterval);
+            }
+
+            heartbeatInterval = setInterval(function () {
+                if (aktuelleRichtung !== null) {
+                    senden("/fahren/" + aktuelleRichtung)
+                        .then(function (response) {
+                            if (!response.ok) {
+                                throw new Error("Heartbeat fehlgeschlagen");
+                            }
+                        })
+                        .catch(function () {
+                            setStatus("Verbindung verloren");
+                            resetFahrButton();
+                            aktuelleRichtung = null;
+
+                            if (heartbeatInterval !== null) {
+                                clearInterval(heartbeatInterval);
+                                heartbeatInterval = null;
+                            }
+                        });
+                }
+            }, HEARTBEAT_INTERVAL_MS);
+        }
+
+        function stoppen(force = false) {
+            if (aktuelleRichtung === null && !force) {
+                resetFahrButton();
+                return;
+            }
+
+            aktuelleRichtung = null;
+            resetFahrButton();
+
+            if (heartbeatInterval !== null) {
+                clearInterval(heartbeatInterval);
+                heartbeatInterval = null;
+            }
+
+            senden("/fahren/stop")
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("Stop fehlgeschlagen");
+                    }
+
+                    setStatus("gestoppt");
+                })
+                .catch(function () {
+                    setStatus("Fehler Stopp");
+                });
+        }
+
+        function ledToggle() {
+            senden("/led/toggle")
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("LED fehlgeschlagen");
+                    }
+
+                    setStatus("LED umgeschaltet");
+                })
+                .catch(function () {
+                    setStatus("Fehler LED");
+                });
+        }
+
+        function shutdownPi() {
+            setStatus("Shutdown wird gesendet");
+
+            fetch("/shutdown", {
+                method: "POST",
+                cache: "no-store"
+            })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Shutdown fehlgeschlagen");
+                }
+
+                setStatus("Pi fährt herunter");
+            })
+            .catch(function () {
+                setStatus("Fehler Shutdown");
+            });
+        }
+
+        function toggleHelp() {
+            document.getElementById("helpBox").classList.toggle("active");
+        }
+
+        function formatAufloesung(text) {
+            if (!text) {
+                return "--- x ---";
+            }
+
+            return String(text).replace("x", " x ");
+        }
+
+        function updatePiStatus() {
+            fetch("/api/status", {
+                method: "GET",
+                cache: "no-store"
+            })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Status fehlgeschlagen");
+                }
+
+                return response.json();
+            })
+            .then(function (data) {
+                piZeit = data.zeit || "--:--:--";
+                streamAufloesung = formatAufloesung(data.aufloesung);
+                streamFps = data.fps || "--";
+                renderTopStatus();
+            })
+            .catch(function () {
+                piZeit = "--:--:--";
+                streamAufloesung = "--- x ---";
+                streamFps = "--";
+                renderTopStatus();
+            });
+        }
+
+        function updatePing() {
+            const start = performance.now();
+
+            fetch("/api/ping?t=" + Date.now(), {
+                method: "GET",
+                cache: "no-store"
+            })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Ping fehlgeschlagen");
+                }
+
+                const ende = performance.now();
+                pingMs = Math.round(ende - start);
+                renderTopStatus();
+            })
+            .catch(function () {
+                pingMs = "--";
+                renderTopStatus();
+            });
+        }
+
+        window.addEventListener("pointerup", function () {
+            stoppen(true);
+        });
+
+        window.addEventListener("pointercancel", function () {
+            stoppen(true);
+        });
+
+        window.addEventListener("beforeunload", function () {
+            navigator.sendBeacon("/fahren/stop");
+        });
+
+        document.addEventListener("visibilitychange", function () {
+            if (document.hidden) {
+                navigator.sendBeacon("/fahren/stop");
+            }
+        });
+
+        document.addEventListener("keydown", function (event) {
+            if (event.repeat) {
+                return;
+            }
+
+            if (event.key === "w" || event.key === "W") {
+                fahren("vorwaerts");
+            } else if (event.key === "s" || event.key === "S") {
+                fahren("rueckwaerts");
+            } else if (event.key === "a" || event.key === "A") {
+                fahren("links");
+            } else if (event.key === "d" || event.key === "D") {
+                fahren("rechts");
+            } else if (event.key === " ") {
+                event.preventDefault();
+                stoppen(true);
+            }
+        });
+
+        document.addEventListener("keyup", function (event) {
+            if (
+                event.key === "w" || event.key === "W" ||
+                event.key === "s" || event.key === "S" ||
+                event.key === "a" || event.key === "A" ||
+                event.key === "d" || event.key === "D"
+            ) {
+                stoppen(true);
+            }
+        });
+
+        updateSpeed();
+        updatePiStatus();
+        updatePing();
+        renderTopStatus();
+
+        setInterval(updatePiStatus, 1000);
+        setInterval(updatePing, 2000);
+    </script>
+</body>
+</html>
